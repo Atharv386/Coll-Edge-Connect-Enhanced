@@ -17,27 +17,28 @@
     };
   })();
 
-  // DOM Enhancements (Run after hydration completes)
+  // DOM Enhancements (Fully hydration-resilient with Event Delegation and MutationObserver)
   document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => {
-      try {
-        // 1. Accessibility emoji wrapping
-        const emojiLabels = {
-          "🏛️": "Institute",
-          "🎓": "College",
-          "🏫": "Campus",
-          "🎯": "Target",
-          "🎤": "Microphone",
-          "📍": "Location Pin",
-          "✉️": "Envelope",
-          "📞": "Telephone",
-          "🟢": "Green Bullet",
-          "⚡": "Lightning Bolt",
-          "✅": "Success Checkmark"
-        };
+    try {
+      // 1. Emoji wrapping mapping
+      const emojiLabels = {
+        "🏛️": "Institute",
+        "🎓": "College",
+        "🏫": "Campus",
+        "🎯": "Target",
+        "🎤": "Microphone",
+        "📍": "Location Pin",
+        "✉️": "Envelope",
+        "📞": "Telephone",
+        "🟢": "Green Bullet",
+        "⚡": "Lightning Bolt",
+        "✅": "Success Checkmark"
+      };
 
-        // Wrap standalone emojis dynamically
-        document.querySelectorAll(".college-icon, .service-icon, .brand-pill, .contact-item-icon").forEach(el => {
+      const wrapEmojis = (root) => {
+        const targets = root.querySelectorAll ? root.querySelectorAll(".college-icon, .service-icon, .brand-pill, .contact-item-icon") : [];
+        targets.forEach(el => {
+          if (el.querySelector('span[role="img"]')) return; // already wrapped
           const text = el.textContent.trim();
           for (const [emoji, label] of Object.entries(emojiLabels)) {
             if (text.includes(emoji)) {
@@ -45,234 +46,228 @@
             }
           }
         });
+      };
 
-        // 2. Form accessibility & labels
-        const nameInput = document.querySelector('input[name="name"]');
-        if (nameInput) {
-          nameInput.id = "form-name";
-          nameInput.required = true;
-          nameInput.setAttribute("aria-required", "true");
-          const parent = nameInput.parentElement;
-          if (parent) {
-            const label = parent.querySelector('label');
-            if (label) label.setAttribute("for", "form-name");
-          }
+      // 2. Enforce all direct DOM attributes and content overrides
+      const enforceDOMModifications = () => {
+        // Enforce emoji wrapping
+        wrapEmojis(document);
+
+        // Footer Copy Link
+        const footerCopyText = document.querySelector('.footer-copy-text');
+        if (footerCopyText && !footerCopyText.querySelector('a')) {
+          footerCopyText.innerHTML = 'Redesign Concept &amp; Modification. Original site: <a href="https://colledgeconnect.in/" target="_blank" rel="noopener noreferrer" style="color:var(--neon);text-decoration:underline;position:relative;z-index:10;pointer-events:auto">colledgeconnect.in</a>';
         }
 
-        const emailInput = document.querySelector('input[name="email"]');
-        if (emailInput) {
-          emailInput.id = "form-email";
-          emailInput.required = true;
-          emailInput.setAttribute("aria-required", "true");
-          const parent = emailInput.parentElement;
-          if (parent) {
-            const label = parent.querySelector('label');
-            if (label) label.setAttribute("for", "form-email");
-          }
-        }
+        // Contact Form accessibility IDs and labels
+        const inputs = [
+          { name: "name", id: "form-name" },
+          { name: "email", id: "form-email" },
+          { name: "phone", id: "form-phone" },
+          { name: "organization", id: "form-organization" },
+          { name: "message", id: "form-message", isTextarea: true }
+        ];
 
-        const phoneInput = document.querySelector('input[name="phone"]');
-        if (phoneInput) {
-          phoneInput.id = "form-phone";
-          phoneInput.required = true;
-          phoneInput.setAttribute("aria-required", "true");
-          const parent = phoneInput.parentElement;
-          if (parent) {
-            const label = parent.querySelector('label');
-            if (label) label.setAttribute("for", "form-phone");
+        inputs.forEach(inputDef => {
+          const el = document.querySelector(`${inputDef.isTextarea ? 'textarea' : 'input'}[name="${inputDef.name}"]`);
+          if (el && el.id !== inputDef.id) {
+            el.id = inputDef.id;
+            el.required = true;
+            el.setAttribute("aria-required", "true");
+            const parent = el.parentElement;
+            if (parent) {
+              const label = parent.querySelector('label');
+              if (label) label.setAttribute("for", inputDef.id);
+            }
           }
-        }
+        });
 
-        const orgInput = document.querySelector('input[name="organization"]');
-        if (orgInput) {
-          orgInput.id = "form-organization";
-          orgInput.required = true;
-          orgInput.setAttribute("aria-required", "true");
-          const parent = orgInput.parentElement;
-          if (parent) {
-            const label = parent.querySelector('label');
-            if (label) label.setAttribute("for", "form-organization");
-          }
-        }
-
-        const msgInput = document.querySelector('textarea[name="message"]');
-        if (msgInput) {
-          msgInput.id = "form-message";
-          msgInput.required = true;
-          msgInput.setAttribute("aria-required", "true");
-          const parent = msgInput.parentElement;
-          if (parent) {
-            const label = parent.querySelector('label');
-            if (label) label.setAttribute("for", "form-message");
-          }
-        }
-
-        // Add role to form container
+        // Contact Form accessibility landmark role
         const formSubmitBtn = document.querySelector('button[disabled]');
         if (formSubmitBtn) {
           const formWrapper = formSubmitBtn.closest('div[style*="display: flex"]');
-          if (formWrapper) {
+          if (formWrapper && formWrapper.getAttribute("role") !== "form") {
             formWrapper.setAttribute("role", "form");
             formWrapper.setAttribute("aria-label", "Contact Form");
           }
         }
+      };
 
-        // 3. Scroll Spy for navigation highlighting
-        const sections = document.querySelectorAll("section[id]");
-        const navLinks = document.querySelectorAll(".nav-links a");
+      // Run modifications immediately
+      enforceDOMModifications();
+
+      // Setup MutationObserver to watch for React Hydration overrides
+      const observer = new MutationObserver(() => {
+        enforceDOMModifications();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      // Run a fallback interval for 5 seconds
+      let checkCount = 0;
+      const intervalId = setInterval(() => {
+        enforceDOMModifications();
+        checkCount++;
+        if (checkCount > 10) clearInterval(intervalId);
+      }, 500);
+
+      // 3. Scroll Spy for navigation highlighting
+      const sections = document.querySelectorAll("section[id]");
+      const navLinks = document.querySelectorAll(".nav-links a");
+      
+      function scrollSpy() {
+        let currentSectionId = "";
+        const scrollPosition = window.scrollY + 150; // offset for nav height
         
-        function scrollSpy() {
-          let currentSectionId = "";
-          const scrollPosition = window.scrollY + 150; // offset for nav height
-          
-          sections.forEach(section => {
-            const sectionTop = section.offsetTop;
-            const sectionHeight = section.offsetHeight;
-            if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
-              currentSectionId = section.getAttribute("id");
-            }
-          });
-
-          navLinks.forEach(link => {
-            link.classList.remove("active");
-            const href = link.getAttribute("href");
-            if (href === `#${currentSectionId}` || (currentSectionId === "" && href === "#")) {
-              link.classList.add("active");
-            }
-          });
-        }
-
-        window.addEventListener("scroll", scrollSpy);
-        scrollSpy(); // Initial run
-
-        // 4. Scroll progress fallback for unsupported browsers
-        if (!CSS.supports('animation-timeline', 'scroll()')) {
-          const progress = document.querySelector('#scroll-progress');
-          if (progress) {
-            window.addEventListener('scroll', () => {
-              const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-              if (scrollable > 0) {
-                const progressPercentage = window.scrollY / scrollable;
-                progress.style.transform = `scaleX(${progressPercentage})`;
-              }
-            }, { passive: true });
+        sections.forEach(section => {
+          const sectionTop = section.offsetTop;
+          const sectionHeight = section.offsetHeight;
+          if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+            currentSectionId = section.getAttribute("id");
           }
-        }
-
-        // 5. Glassmorphic card spotlight glow event delegation
-        document.addEventListener('mousemove', e => {
-          const card = e.target.closest('.service-card, .why-card, .testi-card, .college-card');
-          if (card) {
-            const rect = card.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            card.style.setProperty('--mouse-x', `${x}px`);
-            card.style.setProperty('--mouse-y', `${y}px`);
-          }
-        }, { passive: true });
-
-        // 6. Cryptographic Text Scramble Decryptor
-        const scrambleTextNode = (node, duration = 800) => {
-          const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+=-_";
-          const targetText = node.nodeValue.trim();
-          if (!targetText) return;
-          const cacheKey = '__scramble_orig';
-          if (!node[cacheKey]) {
-            node[cacheKey] = node.nodeValue;
-          }
-          const originalValue = node[cacheKey];
-          let start = null;
-          const step = (timestamp) => {
-            if (!start) start = timestamp;
-            const progress = Math.min((timestamp - start) / duration, 1);
-            const scrambleCount = Math.floor((1 - progress) * originalValue.length);
-            let result = "";
-            for (let i = 0; i < originalValue.length; i++) {
-              if (originalValue[i] === " " || originalValue[i] === "\n") {
-                result += originalValue[i];
-              } else if (i < originalValue.length - scrambleCount) {
-                result += originalValue[i];
-              } else {
-                result += chars[Math.floor(Math.random() * chars.length)];
-              }
-            }
-            node.nodeValue = result;
-            if (progress < 1) {
-              requestAnimationFrame(step);
-            }
-          };
-          requestAnimationFrame(step);
-        };
-
-        const scrambleElement = (el, duration = 800) => {
-          el.childNodes.forEach(node => {
-            if (node.nodeType === Node.TEXT_NODE) {
-              scrambleTextNode(node, duration);
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-              scrambleElement(node, duration);
-            }
-          });
-        };
-
-        // Hook up hover events
-        const logos = document.querySelectorAll('.nav-logo');
-        logos.forEach(logo => {
-          logo.style.cursor = 'pointer';
-          logo.addEventListener('mouseenter', () => scrambleElement(logo, 600));
         });
 
-        const navItemLinks = document.querySelectorAll('.nav-links a, .sidebar-link');
-        navItemLinks.forEach(link => {
-          link.addEventListener('mouseenter', () => scrambleElement(link, 600));
+        navLinks.forEach(link => {
+          link.classList.remove("active");
+          const href = link.getAttribute("href");
+          if (href === `#${currentSectionId}` || (currentSectionId === "" && href === "#")) {
+            link.classList.add("active");
+          }
         });
-
-        // Trigger scramble on load for epic visual impact
-        setTimeout(() => {
-          logos.forEach(logo => scrambleElement(logo, 800));
-          navItemLinks.forEach(link => scrambleElement(link, 800));
-          
-          const heroBadge = document.querySelector('.hero-badge');
-          if (heroBadge) scrambleElement(heroBadge, 1000);
-        }, 400);
-
-        // 7. Footer copyright rich link override
-        const footerCopyText = document.querySelector('.footer-copy-text');
-        if (footerCopyText) {
-          footerCopyText.innerHTML = 'Redesign Concept &amp; Modification. Original site: <a href="https://colledgeconnect.in/" target="_blank" rel="noopener noreferrer" style="color:var(--neon);text-decoration:underline;position:relative;z-index:10;pointer-events:auto">colledgeconnect.in</a>';
-        }
-
-        // 8. Dynamic Parallax Background Orbs
-        const orb1 = document.querySelector('.hero-orb');
-        const orb2 = document.querySelector('.hero-orb2');
-        if (orb1 && orb2) {
-          window.addEventListener('mousemove', e => {
-            const x = e.clientX - window.innerWidth / 2;
-            const y = e.clientY - window.innerHeight / 2;
-            orb1.style.transform = `translate3d(${x * 0.03}px, ${y * 0.03}px, 0)`;
-            orb2.style.transform = `translate3d(${x * -0.04}px, ${y * -0.04}px, 0)`;
-          }, { passive: true });
-        }
-
-        // 9. Magnetic CTA Buttons
-        const magneticCTAs = document.querySelectorAll('.btn-primary, .btn-ghost, .nav-cta-desktop');
-        magneticCTAs.forEach(btn => {
-          btn.addEventListener('mousemove', e => {
-            const rect = btn.getBoundingClientRect();
-            const x = e.clientX - (rect.left + rect.width / 2);
-            const y = e.clientY - (rect.top + rect.height / 2);
-            btn.style.transition = 'transform 0.1s cubic-bezier(0.25, 1, 0.5, 1)';
-            btn.style.transform = `translate3d(${x * 0.35}px, ${y * 0.35}px, 0) scale(1.05)`;
-          }, { passive: true });
-          btn.addEventListener('mouseleave', () => {
-            btn.style.transition = 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)';
-            btn.style.transform = 'translate3d(0, 0, 0)';
-          }, { passive: true });
-        });
-
-      } catch (err) {
-        console.error("DOM Enhancer failed:", err);
       }
-    }, 120);
+
+      window.addEventListener("scroll", scrollSpy, { passive: true });
+      scrollSpy(); // Initial run
+
+      // 4. Scroll progress fallback for unsupported browsers
+      if (!CSS.supports('animation-timeline', 'scroll()')) {
+        const progress = document.querySelector('#scroll-progress');
+        if (progress) {
+          window.addEventListener('scroll', () => {
+            const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+            if (scrollable > 0) {
+              const progressPercentage = window.scrollY / scrollable;
+              progress.style.transform = `scaleX(${progressPercentage})`;
+            }
+          }, { passive: true });
+        }
+      }
+
+      // 5. Glassmorphic card spotlight glow event delegation
+      document.addEventListener('mousemove', e => {
+        const card = e.target.closest('.service-card, .why-card, .testi-card, .college-card');
+        if (card) {
+          const rect = card.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          card.style.setProperty('--mouse-x', `${x}px`);
+          card.style.setProperty('--mouse-y', `${y}px`);
+        }
+      }, { passive: true });
+
+      // 6. Cryptographic Text Scramble Decryptor (Event Delegated)
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+=-_";
+      const scrambleTextNode = (node, duration = 800) => {
+        const targetText = node.nodeValue.trim();
+        if (!targetText) return;
+        const cacheKey = '__scramble_orig';
+        if (!node[cacheKey]) {
+          node[cacheKey] = node.nodeValue;
+        }
+        const originalValue = node[cacheKey];
+        let start = null;
+        const step = (timestamp) => {
+          if (!start) start = timestamp;
+          const progress = Math.min((timestamp - start) / duration, 1);
+          const scrambleCount = Math.floor((1 - progress) * originalValue.length);
+          let result = "";
+          for (let i = 0; i < originalValue.length; i++) {
+            if (originalValue[i] === " " || originalValue[i] === "\n") {
+              result += originalValue[i];
+            } else if (i < originalValue.length - scrambleCount) {
+              result += originalValue[i];
+            } else {
+              result += chars[Math.floor(Math.random() * chars.length)];
+            }
+          }
+          node.nodeValue = result;
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          }
+        };
+        requestAnimationFrame(step);
+      };
+
+      const scrambleElement = (el, duration = 800) => {
+        el.childNodes.forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            scrambleTextNode(node, duration);
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            scrambleElement(node, duration);
+          }
+        });
+      };
+
+      // Event delegation for text scramble hovers
+      document.addEventListener('mouseover', e => {
+        const link = e.target.closest('.nav-logo, .nav-links a, .sidebar-link');
+        if (link) {
+          if (!link.__scrambleActive) {
+            link.__scrambleActive = true;
+            scrambleElement(link, 600);
+          }
+        }
+      }, { passive: true });
+
+      document.addEventListener('mouseout', e => {
+        const link = e.target.closest('.nav-logo, .nav-links a, .sidebar-link');
+        if (link && (!e.relatedTarget || !link.contains(e.relatedTarget))) {
+          link.__scrambleActive = false;
+        }
+      }, { passive: true });
+
+      // Trigger initial scramble for logo/nav/badge on load
+      setTimeout(() => {
+        document.querySelectorAll('.nav-logo').forEach(logo => scrambleElement(logo, 800));
+        document.querySelectorAll('.nav-links a, .sidebar-link').forEach(link => scrambleElement(link, 800));
+        const heroBadge = document.querySelector('.hero-badge');
+        if (heroBadge) scrambleElement(heroBadge, 1000);
+      }, 500);
+
+      // 7. Dynamic Parallax Background Orbs
+      const orb1 = document.querySelector('.hero-orb');
+      const orb2 = document.querySelector('.hero-orb2');
+      if (orb1 && orb2) {
+        window.addEventListener('mousemove', e => {
+          const x = e.clientX - window.innerWidth / 2;
+          const y = e.clientY - window.innerHeight / 2;
+          orb1.style.transform = `translate3d(${x * 0.03}px, ${y * 0.03}px, 0)`;
+          orb2.style.transform = `translate3d(${x * -0.04}px, ${y * -0.04}px, 0)`;
+        }, { passive: true });
+      }
+
+      // 8. Magnetic CTA Buttons (Event Delegated)
+      document.addEventListener('mousemove', e => {
+        const btn = e.target.closest('.btn-primary, .btn-ghost, .nav-cta-desktop');
+        if (btn) {
+          const rect = btn.getBoundingClientRect();
+          const x = e.clientX - (rect.left + rect.width / 2);
+          const y = e.clientY - (rect.top + rect.height / 2);
+          btn.style.transition = 'transform 0.1s cubic-bezier(0.25, 1, 0.5, 1)';
+          btn.style.transform = `translate3d(${x * 0.35}px, ${y * 0.35}px, 0) scale(1.05)`;
+        }
+      }, { passive: true });
+
+      document.addEventListener('mouseout', e => {
+        const btn = e.target.closest('.btn-primary, .btn-ghost, .nav-cta-desktop');
+        if (btn && (!e.relatedTarget || !btn.contains(e.relatedTarget))) {
+          btn.style.transition = 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)';
+          btn.style.transform = 'translate3d(0, 0, 0)';
+        }
+      }, { passive: true });
+
+    } catch (err) {
+      console.error("DOM Enhancer failed:", err);
+    }
   });
 </script>
 </body></html>
